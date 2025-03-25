@@ -37,3 +37,19 @@ export interface VoucherData {
   theme: VoucherTheme;
   createdAt: number;
 }
+
+/**
+ * Creates a shareable URL that includes voucher data
+ */
+export function createShareableVoucherUrl(voucher: VoucherData): string {
+  const baseUrl = `${window.location.origin}/voucher/${voucher.id}`;
+  const dataToEncode = {
+    title: voucher.title,
+    code: voucher.code,
+    theme: voucher.theme,
+    createdAt: voucher.createdAt
+  };
+  
+  const encodedData = encodeURIComponent(btoa(JSON.stringify(dataToEncode)));
+  return `${baseUrl}?data=${encodedData}`;
+}

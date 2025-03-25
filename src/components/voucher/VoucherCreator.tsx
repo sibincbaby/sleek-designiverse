@@ -34,12 +34,25 @@ export function VoucherCreator() {
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     const voucherId = createVoucher(values.title, values.code, values.theme);
-    const shareUrl = `${window.location.origin}/voucher/${voucherId}`;
     
-    navigator.clipboard.writeText(shareUrl).then(() => {
+    // Create a URL with the voucher ID
+    const baseUrl = `${window.location.origin}/voucher/${voucherId}`;
+    
+    // Also create a data URL that can be used across different browsers/devices
+    const voucherData = {
+      title: values.title,
+      code: values.code,
+      theme: values.theme,
+      createdAt: Date.now()
+    };
+    
+    const dataParam = encodeURIComponent(btoa(JSON.stringify(voucherData)));
+    const universalShareUrl = `${baseUrl}?data=${dataParam}`;
+    
+    navigator.clipboard.writeText(universalShareUrl).then(() => {
       toast({
         title: "Share link copied!",
-        description: "The link to your voucher has been copied to your clipboard.",
+        description: "The link to your voucher has been copied to your clipboard. You can share it with anyone, even on different devices or browsers.",
       });
     });
     

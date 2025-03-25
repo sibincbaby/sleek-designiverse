@@ -1,30 +1,61 @@
 
 import React, { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation } from "react-router-dom";
 import { useVoucher } from "@/contexts/VoucherContext";
 import { VoucherDisplay } from "@/components/voucher/VoucherDisplay";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { VoucherData, VoucherTheme } from "@/lib/voucher-utils";
 
 export default function VoucherView() {
   const { id } = useParams<{ id: string }>();
   const { getVoucherById } = useVoucher();
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [voucherData, setVoucherData] = useState<VoucherData | undefined>(undefined);
   
-  const voucher = id ? getVoucherById(id) : undefined;
+  const location = useLocation();
   
   useEffect(() => {
+    // First try to get voucher data from URL parameter
+    const searchParams = new URLSearchParams(location.search);
+    const encodedData = searchParams.get('data');
+    
+    if (encodedData) {
+      try {
+        const decodedData = JSON.parse(atob(decodeURIComponent(encodedData)));
+        if (id) {
+          setVoucherData({
+            id,
+            title: decodedData.title,
+            code: decodedData.code,
+            theme: decodedData.theme,
+            createdAt: decodedData.createdAt
+          });
+          setLoading(false);
+          return;
+        }
+      } catch (error) {
+        console.error("Error parsing voucher data from URL:", error);
+      }
+    }
+    
+    // If no URL data, try to get from local storage
+    const storedVoucher = id ? getVoucherById(id) : undefined;
+    
     // Short timeout to allow for smooth transitions
     const timer = setTimeout(() => {
       setLoading(false);
-      if (!voucher) {
-        setNotFound(true);
+      
+      if (storedVoucher) {
+        setVoucherData(storedVoucher);
+      } else {
+        setNotFound(!encodedData); // Only set not found if we also didn't have URL data
       }
     }, 300);
     
     return () => clearTimeout(timer);
-  }, [voucher]);
+  }, [id, getVoucherById, location.search]);
 
   if (loading) {
     return (
@@ -63,7 +94,7 @@ export default function VoucherView() {
         </Link>
       </div>
       
-      {voucher && <VoucherDisplay voucher={voucher} />}
+      {voucherData && <VoucherDisplay voucher={voucherData} />}
     </div>
   );
 }
