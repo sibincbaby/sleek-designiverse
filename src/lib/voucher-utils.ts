@@ -11,21 +11,41 @@ export function generateUniqueId(): string {
  * Available voucher themes
  */
 export const VOUCHER_THEMES = [
-  { id: "birthday", name: "Birthday", 
-    colors: "bg-gradient-to-r from-pink-500 to-purple-600", 
-    icon: "gift" },
-  { id: "wedding", name: "Wedding", 
-    colors: "bg-gradient-to-r from-blue-400 to-indigo-500", 
-    icon: "gift" },
-  { id: "anniversary", name: "Anniversary", 
-    colors: "bg-gradient-to-r from-amber-500 to-red-500", 
-    icon: "calendar" },
-  { id: "thank-you", name: "Thank You", 
-    colors: "bg-gradient-to-r from-green-400 to-emerald-500", 
-    icon: "gift" },
-  { id: "congratulations", name: "Congratulations", 
-    colors: "bg-gradient-to-r from-yellow-400 to-orange-500", 
-    icon: "calendar-check" },
+  { 
+    id: "birthday", 
+    name: "Birthday", 
+    colors: "bg-gradient-to-r from-pink-500 via-pink-400 to-purple-600", 
+    icon: "cake",
+    emoji: "🎂"
+  },
+  { 
+    id: "wedding", 
+    name: "Wedding", 
+    colors: "bg-gradient-to-r from-blue-300 via-indigo-400 to-blue-500", 
+    icon: "heart",
+    emoji: "💍" 
+  },
+  { 
+    id: "anniversary", 
+    name: "Anniversary", 
+    colors: "bg-gradient-to-r from-amber-400 via-red-400 to-amber-500", 
+    icon: "trophy",
+    emoji: "🥂" 
+  },
+  { 
+    id: "thank-you", 
+    name: "Thank You", 
+    colors: "bg-gradient-to-r from-emerald-400 via-green-500 to-teal-500", 
+    icon: "smile",
+    emoji: "🙏" 
+  },
+  { 
+    id: "congratulations", 
+    name: "Congratulations", 
+    colors: "bg-gradient-to-r from-yellow-300 via-yellow-400 to-orange-500", 
+    icon: "award",
+    emoji: "🎉" 
+  },
 ] as const;
 
 export type VoucherTheme = typeof VOUCHER_THEMES[number]['id'];

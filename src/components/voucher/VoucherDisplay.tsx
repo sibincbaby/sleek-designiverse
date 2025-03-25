@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { Calendar, Copy, Share } from "lucide-react";
+import { Calendar, Copy, Share, Gift } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,7 +44,7 @@ export function VoucherDisplay({ voucher }: VoucherDisplayProps) {
   };
   
   return (
-    <Card className={`w-full max-w-md mx-auto overflow-hidden ${theme.colors} text-white`}>
+    <Card className={`w-full max-w-md mx-auto overflow-hidden shadow-lg ${theme.colors} text-white`}>
       <CardHeader className="pb-2">
         <div className="flex justify-between items-center">
           <Calendar className="h-6 w-6" />
@@ -52,7 +52,10 @@ export function VoucherDisplay({ voucher }: VoucherDisplayProps) {
             {new Date(voucher.createdAt).toLocaleDateString()}
           </div>
         </div>
-        <CardTitle className="text-2xl font-bold mt-4">{voucher.title}</CardTitle>
+        <div className="flex items-center justify-between mt-4">
+          <CardTitle className="text-2xl font-bold">{voucher.title}</CardTitle>
+          <span className="text-4xl animate-bounce">{theme.emoji}</span>
+        </div>
       </CardHeader>
       <CardContent className="pb-2">
         <div className="bg-white/20 backdrop-blur-sm rounded-lg p-6 text-center">

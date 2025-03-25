@@ -4,7 +4,7 @@ import { useParams, Link, useLocation } from "react-router-dom";
 import { useVoucher } from "@/contexts/VoucherContext";
 import { VoucherDisplay } from "@/components/voucher/VoucherDisplay";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, PlusCircle } from "lucide-react";
 import { VoucherData, VoucherTheme } from "@/lib/voucher-utils";
 
 export default function VoucherView() {
@@ -85,16 +85,16 @@ export default function VoucherView() {
   
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md mx-auto mb-6">
+      {voucherData && <VoucherDisplay voucher={voucherData} />}
+      
+      <div className="mt-8">
         <Link to="/" className="inline-block">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Create Your Own
+          <Button variant="outline" size="sm" className="shadow-sm">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Create Your Own Voucher
           </Button>
         </Link>
       </div>
-      
-      {voucherData && <VoucherDisplay voucher={voucherData} />}
     </div>
   );
 }

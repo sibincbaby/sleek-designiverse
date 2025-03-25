@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { useVoucher } from "@/contexts/VoucherContext";
-import { VOUCHER_THEMES, VoucherTheme } from "@/lib/voucher-utils";
+import { VOUCHER_THEMES, VoucherTheme, createShareableVoucherUrl } from "@/lib/voucher-utils";
 import { Gift, Share } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -125,10 +125,13 @@ export function VoucherCreator() {
                                   field.value === theme.id
                                     ? `ring-2 ring-primary ${theme.colors}`
                                     : theme.colors
-                                } flex items-center justify-center p-3 rounded-md cursor-pointer text-white w-full`}
+                                } flex items-center justify-between p-3 rounded-md cursor-pointer text-white w-full`}
                               >
-                                <Gift className="mr-2 h-4 w-4" />
-                                {theme.name}
+                                <div className="flex items-center">
+                                  <Gift className="mr-2 h-4 w-4" />
+                                  {theme.name}
+                                </div>
+                                <span className="text-xl">{theme.emoji}</span>
                               </label>
                             </div>
                           </FormControl>
