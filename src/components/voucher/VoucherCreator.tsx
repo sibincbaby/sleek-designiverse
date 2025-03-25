@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { useVoucher } from "@/contexts/VoucherContext";
 import { VOUCHER_THEMES, VoucherTheme, createShareableVoucherUrl } from "@/lib/voucher-utils";
-import { Gift, Share } from "lucide-react";
+import { Gift, Share, Tag } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 const formSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters").max(50, "Title cannot exceed 50 characters"),
   code: z.string().min(3, "Code must be at least 3 characters").max(30, "Code cannot exceed 30 characters"),
-  theme: z.enum(["birthday", "wedding", "anniversary", "thank-you", "congratulations"] as const)
+  theme: z.enum(["birthday", "wedding", "anniversary", "thank-you", "congratulations"] as const),
+  provider: z.string().min(2, "Provider must be at least 2 characters").max(30, "Provider cannot exceed 30 characters").optional()
 });
 
 export function VoucherCreator() {
@@ -28,12 +29,13 @@ export function VoucherCreator() {
     defaultValues: {
       title: "",
       code: "",
-      theme: "birthday" as VoucherTheme
+      theme: "birthday" as VoucherTheme,
+      provider: ""
     },
   });
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    const voucherId = createVoucher(values.title, values.code, values.theme);
+    const voucherId = createVoucher(values.title, values.code, values.theme, values.provider || "");
     
     // Create a URL with the voucher ID
     const baseUrl = `${window.location.origin}/voucher/${voucherId}`;
@@ -43,6 +45,7 @@ export function VoucherCreator() {
       title: values.title,
       code: values.code,
       theme: values.theme,
+      provider: values.provider || "",
       createdAt: Date.now()
     };
     
@@ -78,6 +81,20 @@ export function VoucherCreator() {
                   <FormLabel>Title</FormLabel>
                   <FormControl>
                     <Input placeholder="e.g. Birthday Gift Card" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="provider"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Provider</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g. Amazon, Flipkart, Starbucks" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { Calendar, Copy, Share, Gift } from "lucide-react";
+import { Calendar, Copy, Share, Gift, Tag } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,6 +56,12 @@ export function VoucherDisplay({ voucher }: VoucherDisplayProps) {
           <CardTitle className="text-2xl font-bold">{voucher.title}</CardTitle>
           <span className="text-4xl animate-bounce">{theme.emoji}</span>
         </div>
+        {voucher.provider && (
+          <div className="flex items-center mt-2 text-sm bg-white/10 px-2 py-1 rounded-md w-fit">
+            <Tag className="h-3 w-3 mr-1" />
+            <span>{voucher.provider}</span>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="pb-2">
         <div className="bg-white/20 backdrop-blur-sm rounded-lg p-6 text-center">

@@ -55,6 +55,7 @@ export interface VoucherData {
   title: string;
   code: string;
   theme: VoucherTheme;
+  provider: string;
   createdAt: number;
 }
 
@@ -67,6 +68,7 @@ export function createShareableVoucherUrl(voucher: VoucherData): string {
     title: voucher.title,
     code: voucher.code,
     theme: voucher.theme,
+    provider: voucher.provider,
     createdAt: voucher.createdAt
   };
   

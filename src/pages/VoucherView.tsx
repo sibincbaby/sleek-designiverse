@@ -30,6 +30,7 @@ export default function VoucherView() {
             title: decodedData.title,
             code: decodedData.code,
             theme: decodedData.theme,
+            provider: decodedData.provider || "",
             createdAt: decodedData.createdAt
           });
           setLoading(false);
