@@ -77,7 +77,7 @@ export function VoucherDisplay({ voucher }: VoucherDisplayProps) {
         <Button 
           onClick={shareVoucher}
           variant="outline" 
-          className="border-white text-white hover:bg-white/20"
+          className="border-white text-white bg-white/20 hover:bg-white/30 flex items-center"
         >
           <Share className="mr-2 h-4 w-4" />
           Share
