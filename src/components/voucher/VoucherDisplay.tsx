@@ -4,7 +4,7 @@ import { Calendar, Copy, Share, Gift, Tag } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { VOUCHER_THEMES, VoucherData } from "@/lib/voucher-utils";
+import { VOUCHER_THEMES, VoucherData, shortenUrl } from "@/lib/voucher-utils";
 
 interface VoucherDisplayProps {
   voucher: VoucherData;
@@ -13,6 +13,7 @@ interface VoucherDisplayProps {
 export function VoucherDisplay({ voucher }: VoucherDisplayProps) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
+  const [sharing, setSharing] = useState(false);
   
   const theme = VOUCHER_THEMES.find(t => t.id === voucher.theme) || VOUCHER_THEMES[0];
   
@@ -27,19 +28,36 @@ export function VoucherDisplay({ voucher }: VoucherDisplayProps) {
     setTimeout(() => setCopied(false), 2000);
   };
   
-  const shareVoucher = () => {
-    if (navigator.share) {
-      navigator.share({
-        title: voucher.title,
-        text: `Check out my voucher: ${voucher.title}`,
-        url: window.location.href,
-      }).catch(console.error);
-    } else {
-      navigator.clipboard.writeText(window.location.href);
+  const shareVoucher = async () => {
+    setSharing(true);
+    try {
+      // Get the current URL and shorten it
+      const currentUrl = window.location.href;
+      const shortenedUrl = await shortenUrl(currentUrl);
+      
+      if (navigator.share) {
+        await navigator.share({
+          title: voucher.title,
+          text: `Check out my ${voucher.provider ? voucher.provider + ' ' : ''}voucher: ${voucher.title}`,
+          url: shortenedUrl,
+        });
+      } else {
+        // If Web Share API is not available, copy the shortened link
+        await navigator.clipboard.writeText(shortenedUrl);
+        toast({
+          title: "Ready to share!",
+          description: "The voucher link is now on your clipboard, ready to send.",
+        });
+      }
+    } catch (error) {
+      console.error("Error sharing voucher:", error);
       toast({
-        title: "Link copied!",
-        description: "The voucher link has been copied to your clipboard.",
+        title: "Something went wrong",
+        description: "Couldn't prepare your voucher for sharing. Please try again.",
+        variant: "destructive",
       });
+    } finally {
+      setSharing(false);
     }
   };
   
@@ -84,9 +102,10 @@ export function VoucherDisplay({ voucher }: VoucherDisplayProps) {
           onClick={shareVoucher}
           variant="outline" 
           className="border-white text-white bg-white/20 hover:bg-white/30 flex items-center"
+          disabled={sharing}
         >
           <Share className="mr-2 h-4 w-4" />
-          Share
+          {sharing ? "Preparing..." : "Send to Friend"}
         </Button>
       </CardFooter>
     </Card>
