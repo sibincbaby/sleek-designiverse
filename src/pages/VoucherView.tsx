@@ -5,7 +5,7 @@ import { useVoucher } from "@/contexts/VoucherContext";
 import { VoucherDisplay } from "@/components/voucher/VoucherDisplay";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, PlusCircle } from "lucide-react";
-import { VoucherData, VoucherTheme } from "@/lib/voucher-utils";
+import { VoucherData, VoucherTheme, updateMetaTags } from "@/lib/voucher-utils";
 
 export default function VoucherView() {
   const { id } = useParams<{ id: string }>();
@@ -25,14 +25,20 @@ export default function VoucherView() {
       try {
         const decodedData = JSON.parse(atob(decodeURIComponent(encodedData)));
         if (id) {
-          setVoucherData({
+          const voucher = {
             id,
             title: decodedData.title,
             code: decodedData.code,
             theme: decodedData.theme,
             provider: decodedData.provider || "",
             createdAt: decodedData.createdAt
-          });
+          };
+          
+          setVoucherData(voucher);
+          
+          // Update meta tags with voucher information
+          updateMetaTags(voucher.title, voucher.provider, voucher.theme);
+          
           setLoading(false);
           return;
         }
@@ -50,6 +56,9 @@ export default function VoucherView() {
       
       if (storedVoucher) {
         setVoucherData(storedVoucher);
+        
+        // Update meta tags with voucher information
+        updateMetaTags(storedVoucher.title, storedVoucher.provider, storedVoucher.theme);
       } else {
         setNotFound(!encodedData); // Only set not found if we also didn't have URL data
       }

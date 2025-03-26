@@ -1,12 +1,12 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { useVoucher } from "@/contexts/VoucherContext";
-import { VOUCHER_THEMES, VoucherTheme, createShareableVoucherUrl } from "@/lib/voucher-utils";
-import { Gift, Share, Tag } from "lucide-react";
+import { VOUCHER_THEMES, VoucherTheme, createShareableVoucherUrl, shortenUrl } from "@/lib/voucher-utils";
+import { Gift, Share, Loader } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,7 @@ const formSchema = z.object({
 export function VoucherCreator() {
   const { toast } = useToast();
   const { createVoucher } = useVoucher();
+  const [isCreating, setIsCreating] = useState(false);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -34,32 +35,48 @@ export function VoucherCreator() {
     },
   });
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
-    const voucherId = createVoucher(values.title, values.code, values.theme, values.provider || "");
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    setIsCreating(true);
     
-    // Create a URL with the voucher ID
-    const baseUrl = `${window.location.origin}/voucher/${voucherId}`;
-    
-    // Also create a data URL that can be used across different browsers/devices
-    const voucherData = {
-      title: values.title,
-      code: values.code,
-      theme: values.theme,
-      provider: values.provider || "",
-      createdAt: Date.now()
-    };
-    
-    const dataParam = encodeURIComponent(btoa(JSON.stringify(voucherData)));
-    const universalShareUrl = `${baseUrl}?data=${dataParam}`;
-    
-    navigator.clipboard.writeText(universalShareUrl).then(() => {
-      toast({
-        title: "Share link copied!",
-        description: "The link to your voucher has been copied to your clipboard. You can share it with anyone, even on different devices or browsers.",
+    try {
+      const voucherId = createVoucher(values.title, values.code, values.theme, values.provider || "");
+      
+      // Create a URL with the voucher ID
+      const baseUrl = `${window.location.origin}/voucher/${voucherId}`;
+      
+      // Also create a data URL that can be used across different browsers/devices
+      const voucherData = {
+        title: values.title,
+        code: values.code,
+        theme: values.theme,
+        provider: values.provider || "",
+        createdAt: Date.now()
+      };
+      
+      const dataParam = encodeURIComponent(btoa(JSON.stringify(voucherData)));
+      const universalShareUrl = `${baseUrl}?data=${dataParam}`;
+      
+      // Shorten the URL
+      const shortUrl = await shortenUrl(universalShareUrl);
+      
+      navigator.clipboard.writeText(shortUrl).then(() => {
+        toast({
+          title: "Share link copied!",
+          description: "The shortened link to your voucher has been copied to your clipboard. You can share it with anyone.",
+        });
       });
-    });
-    
-    form.reset();
+      
+      form.reset();
+    } catch (error) {
+      console.error("Error creating voucher:", error);
+      toast({
+        title: "Error creating voucher",
+        description: "There was a problem creating your voucher. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (
@@ -161,9 +178,18 @@ export function VoucherCreator() {
               )}
             />
             
-            <Button type="submit" className="w-full">
-              <Share className="mr-2 h-4 w-4" />
-              Create & Share Voucher
+            <Button type="submit" className="w-full" disabled={isCreating}>
+              {isCreating ? (
+                <>
+                  <Loader className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Share className="mr-2 h-4 w-4" />
+                  Create & Share Voucher
+                </>
+              )}
             </Button>
           </form>
         </Form>

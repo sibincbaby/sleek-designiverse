@@ -1,4 +1,5 @@
 
+
 /**
  * Generates a unique ID for voucher links
  */
@@ -75,3 +76,58 @@ export function createShareableVoucherUrl(voucher: VoucherData): string {
   const encodedData = encodeURIComponent(btoa(JSON.stringify(dataToEncode)));
   return `${baseUrl}?data=${encodedData}`;
 }
+
+/**
+ * Shortens a URL using is.gd service
+ */
+export async function shortenUrl(longUrl: string): Promise<string> {
+  try {
+    const response = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(longUrl)}`);
+    if (!response.ok) {
+      throw new Error('URL shortening service failed');
+    }
+    const data = await response.json();
+    return data.shorturl;
+  } catch (error) {
+    console.error('Error shortening URL:', error);
+    return longUrl; // Return original URL if shortening fails
+  }
+}
+
+/**
+ * Updates the document's meta tags for better link sharing
+ */
+export function updateMetaTags(title: string, provider: string, theme: VoucherTheme): void {
+  // Update title
+  document.title = title || 'Voucher';
+  
+  // Find and update meta description
+  let metaDescription = document.querySelector('meta[name="description"]');
+  if (!metaDescription) {
+    metaDescription = document.createElement('meta');
+    metaDescription.setAttribute('name', 'description');
+    document.head.appendChild(metaDescription);
+  }
+  const themeInfo = VOUCHER_THEMES.find(t => t.id === theme) || VOUCHER_THEMES[0];
+  metaDescription.setAttribute('content', 
+    `${title} - ${provider ? `${provider} voucher` : 'Gift voucher'} ${themeInfo.emoji}`);
+  
+  // Update OG tags
+  let ogTitle = document.querySelector('meta[property="og:title"]');
+  if (!ogTitle) {
+    ogTitle = document.createElement('meta');
+    ogTitle.setAttribute('property', 'og:title');
+    document.head.appendChild(ogTitle);
+  }
+  ogTitle.setAttribute('content', title);
+  
+  let ogDescription = document.querySelector('meta[property="og:description"]');
+  if (!ogDescription) {
+    ogDescription = document.createElement('meta');
+    ogDescription.setAttribute('property', 'og:description');
+    document.head.appendChild(ogDescription);
+  }
+  ogDescription.setAttribute('content', 
+    `${provider ? `${provider} voucher` : 'Gift voucher'} - Click to view and use the code! ${themeInfo.emoji}`);
+}
+
