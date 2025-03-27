@@ -115,8 +115,7 @@ export function VoucherCreator() {
       }
     }
     
-    // Check for duplicate code
-    const values = form.getValues();
+    // Check for duplicate code - reuse the same values variable instead of redeclaring it
     if (isDuplicateCode(values.code)) {
       setDuplicateError(true);
       return false;
@@ -574,7 +573,7 @@ export function VoucherCreator() {
                           {isCreating ? (
                             <>
                               <Loader className="mr-2 h-4 w-4 animate-spin" />
-                              Creating...
+                              Creating...\n
                             </>
                           ) : (
                             <>
