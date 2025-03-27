@@ -5,13 +5,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { useVoucher } from "@/contexts/VoucherContext";
 import { VOUCHER_THEMES, VoucherTheme, shortenUrl, sanitizeText, containsProfanity } from "@/lib/voucher-utils";
-import { Gift, Share, Loader, AlertCircle, Calendar } from "lucide-react";
+import { Gift, Share, Loader, AlertCircle, Calendar, Copy, Link2, Check } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { VoucherPreview } from "./VoucherPreview";
 import { RecentVouchers } from "./RecentVouchers";
 
@@ -46,12 +47,14 @@ const formSchema = z.object({
 
 export function VoucherCreator() {
   const { toast } = useToast();
-  const { createVoucher, isDuplicateCode } = useVoucher();
+  const { createVoucher, isDuplicateCode, getDailyVoucherCount } = useVoucher();
   const [isCreating, setIsCreating] = useState(false);
   const [rateLimitError, setRateLimitError] = useState("");
   const [profanityError, setProfanityError] = useState("");
   const [duplicateError, setDuplicateError] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [shortUrl, setShortUrl] = useState<string | null>(null);
+  const [copySuccess, setCopySuccess] = useState(false);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -65,11 +68,18 @@ export function VoucherCreator() {
     },
   });
 
-  // Reset errors when form values change
+  // Check for daily limit on initial load
+  useEffect(() => {
+    const dailyCount = getDailyVoucherCount();
+    if (dailyCount >= MAX_DAILY_VOUCHERS) {
+      setRateLimitError(`You have reached the daily limit of ${MAX_DAILY_VOUCHERS} vouchers. Please try again tomorrow.`);
+    }
+  }, [getDailyVoucherCount]);
+
+  // Reset errors when form values change and check for profanity/duplicates
   useEffect(() => {
     if (rateLimitError) setRateLimitError("");
     if (profanityError) setProfanityError("");
-    if (duplicateError) setDuplicateError(false);
     
     // Check for profanity in real-time
     const values = form.getValues();
@@ -82,11 +92,15 @@ export function VoucherCreator() {
       }
     }
     
-    // Check for duplicate code in real-time
-    if (values.code && isDuplicateCode(values.code)) {
-      setDuplicateError(true);
+    // Check for duplicate code in real-time - only if there's a change in the code field
+    const codeValue = form.watch("code");
+    if (codeValue) {
+      const isDuplicate = isDuplicateCode(codeValue);
+      setDuplicateError(isDuplicate);
+    } else {
+      setDuplicateError(false);
     }
-  }, [form.watch(), rateLimitError, profanityError, duplicateError, isDuplicateCode]);
+  }, [form.watch(), rateLimitError, profanityError, isDuplicateCode]);
 
   // Function to check if we can generate a new voucher
   const canGenerateVoucher = (): boolean => {
@@ -102,6 +116,7 @@ export function VoucherCreator() {
     }
     
     // Check for duplicate code
+    const values = form.getValues();
     if (isDuplicateCode(values.code)) {
       setDuplicateError(true);
       return false;
@@ -163,6 +178,23 @@ export function VoucherCreator() {
     form.setValue('theme', theme);
   };
 
+  const handleCopyLink = async () => {
+    if (shortUrl) {
+      await navigator.clipboard.writeText(shortUrl);
+      setCopySuccess(true);
+      
+      // Reset copy success after a delay
+      setTimeout(() => {
+        setCopySuccess(false);
+      }, 2000);
+      
+      toast({
+        title: "Link copied!",
+        description: "The voucher link has been copied to your clipboard.",
+      });
+    }
+  };
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     // Explicitly prevent auto-submission when just switching themes
     if (isPreviewMode && !isCreating) {
@@ -216,19 +248,18 @@ export function VoucherCreator() {
       
       // Shorten the URL
       const shortUrl = await shortenUrl(universalShareUrl);
+      setShortUrl(shortUrl);
       
       // Store the last generation time for rate limiting
       localStorage.setItem('lastVoucherGeneration', Date.now().toString());
       
       // Copy the shortened link to clipboard
       await navigator.clipboard.writeText(shortUrl);
-      toast({
-        title: "Ready to share!",
-        description: "Your voucher link is ready and copied to your clipboard. Send it to someone special!",
-      });
       
-      form.reset();
-      setIsPreviewMode(false);
+      toast({
+        title: "Voucher created!",
+        description: "Your voucher link is ready and copied to your clipboard.",
+      });
     } catch (error) {
       console.error("Error creating voucher:", error);
       toast({
@@ -398,6 +429,17 @@ export function VoucherCreator() {
                     )}
                   />
                   
+                  <div className="mt-4">
+                    <Alert variant="default" className="bg-slate-100">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Daily Limit Information</AlertTitle>
+                      <AlertDescription className="text-sm">
+                        You can create up to {MAX_DAILY_VOUCHERS} vouchers per day. 
+                        You have created {getDailyVoucherCount()} today.
+                      </AlertDescription>
+                    </Alert>
+                  </div>
+                  
                   <Button 
                     type="button" 
                     className="w-full" 
@@ -453,35 +495,106 @@ export function VoucherCreator() {
                       </dl>
                     </div>
                     
-                    <div className="flex flex-col space-y-3">
-                      <Button 
-                        type="submit" 
-                        className="w-full" 
-                        disabled={isCreating || !form.formState.isValid || !!profanityError || duplicateError}
-                      >
-                        {isCreating ? (
-                          <>
-                            <Loader className="mr-2 h-4 w-4 animate-spin" />
-                            Creating...
-                          </>
-                        ) : (
-                          <>
-                            <Share className="mr-2 h-4 w-4" />
-                            Create & Send Voucher
-                          </>
-                        )}
-                      </Button>
-                      
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        className="w-full" 
-                        onClick={onBackToDetails}
-                        disabled={isCreating}
-                      >
-                        Back to Details
-                      </Button>
-                    </div>
+                    {shortUrl ? (
+                      <div className="space-y-3">
+                        <div className="bg-muted p-3 rounded-md flex items-center">
+                          <div className="truncate mr-2 flex-grow text-sm">
+                            {shortUrl}
+                          </div>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" size="sm" type="button" onClick={handleCopyLink}>
+                                {copySuccess ? (
+                                  <Check className="h-4 w-4 text-green-500" />
+                                ) : (
+                                  <Copy className="h-4 w-4" />
+                                )}
+                                <span className="sr-only">Copy</span>
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-3" side="top">
+                              <div className="flex flex-col space-y-2">
+                                <Button 
+                                  type="button" 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="whitespace-nowrap flex items-center"
+                                  onClick={handleCopyLink}
+                                >
+                                  <Copy className="mr-1 h-3 w-3" />
+                                  Copy link
+                                </Button>
+                                
+                                <Button 
+                                  type="button" 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="whitespace-nowrap flex items-center"
+                                  onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`Check out this voucher: ${shortUrl}`)}`, '_blank')}
+                                >
+                                  <Share className="mr-1 h-3 w-3" />
+                                  Share via WhatsApp
+                                </Button>
+                                
+                                <Button 
+                                  type="button" 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="whitespace-nowrap flex items-center"
+                                  onClick={() => window.open(`mailto:?subject=${encodeURIComponent(`Voucher: ${form.getValues().title}`)}&body=${encodeURIComponent(`I've created a voucher for you: ${shortUrl}`)}`, '_blank')}
+                                >
+                                  <Link2 className="mr-1 h-3 w-3" />
+                                  Share via Email
+                                </Button>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          className="w-full" 
+                          onClick={() => {
+                            form.reset();
+                            setShortUrl(null);
+                            setIsPreviewMode(false);
+                          }}
+                        >
+                          Create Another Voucher
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col space-y-3">
+                        <Button 
+                          type="submit" 
+                          className="w-full" 
+                          disabled={isCreating || !form.formState.isValid || !!profanityError || duplicateError}
+                        >
+                          {isCreating ? (
+                            <>
+                              <Loader className="mr-2 h-4 w-4 animate-spin" />
+                              Creating...
+                            </>
+                          ) : (
+                            <>
+                              <Share className="mr-2 h-4 w-4" />
+                              Create & Send Voucher
+                            </>
+                          )}
+                        </Button>
+                        
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          className="w-full" 
+                          onClick={onBackToDetails}
+                          disabled={isCreating}
+                        >
+                          Back to Details
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

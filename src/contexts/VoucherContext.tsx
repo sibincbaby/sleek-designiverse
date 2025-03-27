@@ -8,6 +8,7 @@ interface VoucherContextProps {
   createVoucher: (title: string, code: string, theme: VoucherTheme, provider: string, message?: string, expiryDate?: string) => string;
   getVoucherById: (id: string) => VoucherData | undefined;
   isDuplicateCode: (code: string) => boolean;
+  getDailyVoucherCount: () => number;
 }
 
 const VoucherContext = createContext<VoucherContextProps | undefined>(undefined);
@@ -73,14 +74,34 @@ export function VoucherProvider({ children }: { children: React.ReactNode }) {
   const getVoucherById = (id: string) => {
     return vouchers.find(v => v.id === id);
   };
-  
-  const isDuplicateCode = (code: string) => {
-    // Check if this code was used today
+
+  // Modified duplicate code checker to be more strict
+  const isDuplicateCode = (code: string): boolean => {
+    if (!code) return false;
+    
+    // Check if this exact code was used today (case insensitive)
     const today = new Date().toDateString();
+    const normalizedCode = code.trim().toLowerCase();
+    
     return vouchers.some(v => {
       const voucherDate = new Date(v.createdAt).toDateString();
-      return v.code === code && voucherDate === today;
+      const voucherCode = v.code.trim().toLowerCase();
+      return voucherCode === normalizedCode && voucherDate === today;
     });
+  };
+
+  // Add a method to get the current daily voucher count
+  const getDailyVoucherCount = (): number => {
+    const voucherCountData = localStorage.getItem('dailyVoucherCount');
+    if (!voucherCountData) return 0;
+    
+    const { count, date } = JSON.parse(voucherCountData);
+    const today = new Date().toDateString();
+    
+    // If it's a new day, reset the counter
+    if (date !== today) return 0;
+    
+    return count;
   };
 
   return (
@@ -90,7 +111,8 @@ export function VoucherProvider({ children }: { children: React.ReactNode }) {
       currentVoucher, 
       createVoucher, 
       getVoucherById,
-      isDuplicateCode
+      isDuplicateCode,
+      getDailyVoucherCount
     }}>
       {children}
     </VoucherContext.Provider>
