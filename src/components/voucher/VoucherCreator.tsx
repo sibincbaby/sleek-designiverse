@@ -5,15 +5,16 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { useVoucher } from "@/contexts/VoucherContext";
-import { VOUCHER_THEMES, VoucherTheme, shortenUrl, sanitizeText } from "@/lib/voucher-utils";
-import { Gift, Share, Loader, AlertCircle } from "lucide-react";
+import { VOUCHER_THEMES, VoucherTheme, shortenUrl, sanitizeText, containsProfanity } from "@/lib/voucher-utils";
+import { Gift, Share, Loader, AlertCircle, Calendar } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { VoucherPreview } from "./VoucherPreview";
+import { RecentVouchers } from "./RecentVouchers";
 
 // Define maximum character limits
 const MAX_CHARS = {
@@ -34,41 +35,79 @@ const formSchema = z.object({
   code: z.string()
     .min(3, "Code must be at least 3 characters")
     .max(MAX_CHARS.code, `Code cannot exceed ${MAX_CHARS.code} characters`),
-  theme: z.enum(["birthday", "wedding", "anniversary", "thank-you", "congratulations"] as const),
+  theme: z.enum(["light", "dark", "elegant", "birthday", "wedding", "anniversary", "thank-you", "congratulations"] as const),
   provider: z.string()
     .max(MAX_CHARS.provider, `Provider cannot exceed ${MAX_CHARS.provider} characters`)
     .optional(),
   message: z.string()
     .max(MAX_CHARS.message, `Message cannot exceed ${MAX_CHARS.message} characters`)
-    .optional()
+    .optional(),
+  expiryDate: z.string().optional()
 });
 
 export function VoucherCreator() {
   const { toast } = useToast();
-  const { createVoucher } = useVoucher();
+  const { createVoucher, isDuplicateCode } = useVoucher();
   const [isCreating, setIsCreating] = useState(false);
   const [rateLimitError, setRateLimitError] = useState("");
+  const [profanityError, setProfanityError] = useState("");
+  const [duplicateError, setDuplicateError] = useState(false);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       title: "",
       code: "",
-      theme: "birthday" as VoucherTheme,
+      theme: "light" as VoucherTheme,
       provider: "",
-      message: ""
+      message: "",
+      expiryDate: ""
     },
   });
 
-  // Reset rate limit error when form values change
+  // Reset errors when form values change
   useEffect(() => {
-    if (rateLimitError) {
-      setRateLimitError("");
+    if (rateLimitError) setRateLimitError("");
+    if (profanityError) setProfanityError("");
+    if (duplicateError) setDuplicateError(false);
+    
+    // Check for profanity in real-time
+    const values = form.getValues();
+    const fields = ['title', 'provider', 'code', 'message'] as const;
+    
+    for (const field of fields) {
+      if (values[field] && containsProfanity(values[field] as string)) {
+        setProfanityError(`Inappropriate language detected in ${field}. Please remove it.`);
+        break;
+      }
     }
-  }, [form.watch(), rateLimitError]);
+    
+    // Check for duplicate code in real-time
+    if (values.code && isDuplicateCode(values.code)) {
+      setDuplicateError(true);
+    }
+  }, [form.watch(), rateLimitError, profanityError, duplicateError, isDuplicateCode]);
 
   // Function to check if we can generate a new voucher
   const canGenerateVoucher = (): boolean => {
+    // Check for profanity
+    const values = form.getValues();
+    const fields = ['title', 'provider', 'code', 'message'] as const;
+    
+    for (const field of fields) {
+      if (values[field] && containsProfanity(values[field] as string)) {
+        setProfanityError(`Inappropriate language detected in ${field}. Please remove it.`);
+        return false;
+      }
+    }
+    
+    // Check for duplicate code
+    if (isDuplicateCode(values.code)) {
+      setDuplicateError(true);
+      return false;
+    }
+    
     // Check for rate limiting
     const lastGeneration = localStorage.getItem('lastVoucherGeneration');
     if (lastGeneration) {
@@ -108,6 +147,23 @@ export function VoucherCreator() {
     return true;
   };
 
+  const onContinueToPreview = () => {
+    // Validate the form before showing preview
+    form.trigger().then(isValid => {
+      if (isValid && !profanityError && !duplicateError) {
+        setIsPreviewMode(true);
+      }
+    });
+  };
+  
+  const onBackToDetails = () => {
+    setIsPreviewMode(false);
+  };
+  
+  const handleThemeChange = (theme: VoucherTheme) => {
+    form.setValue('theme', theme);
+  };
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     // Check rate limiting and daily limits
     if (!canGenerateVoucher()) {
@@ -124,6 +180,7 @@ export function VoucherCreator() {
         theme: values.theme,
         provider: values.provider ? sanitizeText(values.provider) : "",
         message: values.message ? sanitizeText(values.message) : "",
+        expiryDate: values.expiryDate || undefined
       };
 
       const voucherId = createVoucher(
@@ -131,7 +188,8 @@ export function VoucherCreator() {
         sanitizedValues.code, 
         sanitizedValues.theme, 
         sanitizedValues.provider,
-        sanitizedValues.message
+        sanitizedValues.message,
+        sanitizedValues.expiryDate
       );
       
       // Create a URL with the voucher ID and add a timestamp to prevent duplicate URLs
@@ -145,6 +203,7 @@ export function VoucherCreator() {
         theme: sanitizedValues.theme,
         provider: sanitizedValues.provider || "",
         message: sanitizedValues.message || "",
+        expiryDate: sanitizedValues.expiryDate,
         createdAt: timestamp
       };
       
@@ -165,6 +224,7 @@ export function VoucherCreator() {
       });
       
       form.reset();
+      setIsPreviewMode(false);
     } catch (error) {
       console.error("Error creating voucher:", error);
       toast({
@@ -178,182 +238,255 @@ export function VoucherCreator() {
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader>
-        <CardTitle className="text-2xl font-bold text-center">Create a Voucher</CardTitle>
-        <CardDescription className="text-center">
-          Create a beautiful voucher to share with someone special
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {rateLimitError && (
-          <Alert variant="destructive" className="mb-6">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Rate Limited</AlertTitle>
-            <AlertDescription>{rateLimitError}</AlertDescription>
-          </Alert>
-        )}
-        
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem>
-                  <div className="flex justify-between items-center">
-                    <FormLabel>Title</FormLabel>
-                    <span className="text-xs text-muted-foreground">
-                      {field.value.length}/{MAX_CHARS.title}
-                    </span>
-                  </div>
-                  <FormControl>
-                    <Input 
-                      placeholder="e.g. Birthday Gift Card" 
-                      {...field} 
-                      maxLength={MAX_CHARS.title}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="provider"
-              render={({ field }) => (
-                <FormItem>
-                  <div className="flex justify-between items-center">
-                    <FormLabel>Provider</FormLabel>
-                    <span className="text-xs text-muted-foreground">
-                      {field.value?.length || 0}/{MAX_CHARS.provider}
-                    </span>
-                  </div>
-                  <FormControl>
-                    <Input 
-                      placeholder="e.g. Amazon, Flipkart, Starbucks" 
-                      {...field} 
-                      maxLength={MAX_CHARS.provider}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="code"
-              render={({ field }) => (
-                <FormItem>
-                  <div className="flex justify-between items-center">
-                    <FormLabel>Voucher Code</FormLabel>
-                    <span className="text-xs text-muted-foreground">
-                      {field.value.length}/{MAX_CHARS.code}
-                    </span>
-                  </div>
-                  <FormControl>
-                    <Input 
-                      placeholder="e.g. BIRTHDAY2023" 
-                      {...field} 
-                      maxLength={MAX_CHARS.code}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="message"
-              render={({ field }) => (
-                <FormItem>
-                  <div className="flex justify-between items-center">
-                    <FormLabel>Message (Optional)</FormLabel>
-                    <span className="text-xs text-muted-foreground">
-                      {field.value?.length || 0}/{MAX_CHARS.message}
-                    </span>
-                  </div>
-                  <FormControl>
-                    <Textarea 
-                      placeholder="Add a personal message..." 
-                      {...field} 
-                      maxLength={MAX_CHARS.message}
-                      className="resize-none"
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Add a personal note to accompany your voucher
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="theme"
-              render={({ field }) => (
-                <FormItem className="space-y-3">
-                  <FormLabel>Theme</FormLabel>
-                  <FormControl>
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      className="grid grid-cols-1 md:grid-cols-2 gap-2"
-                    >
-                      {VOUCHER_THEMES.map((theme) => (
-                        <FormItem key={theme.id}>
-                          <FormControl>
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem 
-                                value={theme.id} 
-                                id={theme.id} 
-                                className="sr-only" 
-                              />
-                              <label
-                                htmlFor={theme.id}
-                                className={`${
-                                  field.value === theme.id
-                                    ? `ring-2 ring-primary ${theme.colors}`
-                                    : theme.colors
-                                } flex items-center justify-between p-3 rounded-md cursor-pointer text-white w-full`}
-                              >
-                                <div className="flex items-center">
-                                  <Gift className="mr-2 h-4 w-4" />
-                                  {theme.name}
-                                </div>
-                                <span className="text-xl">{theme.emoji}</span>
-                              </label>
-                            </div>
-                          </FormControl>
-                        </FormItem>
-                      ))}
-                    </RadioGroup>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <Button type="submit" className="w-full" disabled={isCreating}>
-              {isCreating ? (
-                <>
-                  <Loader className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
-                </>
+    <>
+      <Card className="w-full max-w-4xl mx-auto">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-center">
+            {isPreviewMode ? "Preview & Create Your Voucher" : "Create a Voucher"}
+          </CardTitle>
+          <CardDescription className="text-center">
+            {isPreviewMode 
+              ? "Check how your voucher will look and select a theme before sharing" 
+              : "Enter your voucher details to get started"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {(rateLimitError || profanityError || duplicateError) && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>There was a problem</AlertTitle>
+              <AlertDescription>
+                {rateLimitError || profanityError || (duplicateError ? "This voucher code has already been shared today." : "")}
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              {!isPreviewMode ? (
+                // Details Entry Mode
+                <div className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex justify-between items-center">
+                          <FormLabel>Title</FormLabel>
+                          <span className={`text-xs ${field.value.length > MAX_CHARS.title * 0.8 ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                            {field.value.length}/{MAX_CHARS.title}
+                          </span>
+                        </div>
+                        <FormControl>
+                          <Input 
+                            placeholder="e.g. Birthday Gift Card" 
+                            {...field} 
+                            maxLength={MAX_CHARS.title}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="provider"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex justify-between items-center">
+                          <FormLabel>Provider</FormLabel>
+                          <span className={`text-xs ${field.value && field.value.length > MAX_CHARS.provider * 0.8 ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                            {field.value?.length || 0}/{MAX_CHARS.provider}
+                          </span>
+                        </div>
+                        <FormControl>
+                          <Input 
+                            placeholder="e.g. Amazon, Starbucks" 
+                            {...field} 
+                            maxLength={MAX_CHARS.provider}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="code"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex justify-between items-center">
+                          <FormLabel>Voucher Code</FormLabel>
+                          <span className={`text-xs ${field.value.length > MAX_CHARS.code * 0.8 ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                            {field.value.length}/{MAX_CHARS.code}
+                          </span>
+                        </div>
+                        <FormControl>
+                          <Input 
+                            placeholder="e.g. BIRTHDAY2023" 
+                            {...field} 
+                            maxLength={MAX_CHARS.code}
+                            className={duplicateError ? "border-red-500" : ""}
+                          />
+                        </FormControl>
+                        {duplicateError && (
+                          <p className="text-sm text-red-500 mt-1">
+                            This voucher code has already been shared today.
+                          </p>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="message"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex justify-between items-center">
+                          <FormLabel>Message (Optional)</FormLabel>
+                          <span className={`text-xs ${field.value && field.value.length > MAX_CHARS.message * 0.8 ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                            {field.value?.length || 0}/{MAX_CHARS.message}
+                          </span>
+                        </div>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Add a personal message..." 
+                            {...field} 
+                            maxLength={MAX_CHARS.message}
+                            className="resize-none"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Add a personal note to accompany your voucher
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="expiryDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex justify-between items-center">
+                          <FormLabel>Expiry Date (Optional)</FormLabel>
+                        </div>
+                        <FormControl>
+                          <div className="flex items-center">
+                            <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
+                            <Input 
+                              type="date" 
+                              {...field} 
+                              min={new Date().toISOString().split('T')[0]}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          Set an expiration date for your voucher
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <Button 
+                    type="button" 
+                    className="w-full" 
+                    onClick={onContinueToPreview}
+                    disabled={!form.formState.isValid || !!profanityError || duplicateError}
+                  >
+                    <Gift className="mr-2 h-4 w-4" />
+                    Continue to Preview
+                  </Button>
+                </div>
               ) : (
-                <>
-                  <Share className="mr-2 h-4 w-4" />
-                  Create & Share Voucher
-                </>
+                // Preview Mode
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-6">
+                    <VoucherPreview 
+                      voucher={form.getValues()} 
+                      onThemeChange={handleThemeChange}
+                    />
+                  </div>
+                  
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-medium mb-3">Voucher Details</h3>
+                      <dl className="divide-y">
+                        <div className="py-2 grid grid-cols-3">
+                          <dt className="text-sm font-medium text-muted-foreground">Title</dt>
+                          <dd className="col-span-2 text-sm">{form.getValues().title}</dd>
+                        </div>
+                        {form.getValues().provider && (
+                          <div className="py-2 grid grid-cols-3">
+                            <dt className="text-sm font-medium text-muted-foreground">Provider</dt>
+                            <dd className="col-span-2 text-sm">{form.getValues().provider}</dd>
+                          </div>
+                        )}
+                        <div className="py-2 grid grid-cols-3">
+                          <dt className="text-sm font-medium text-muted-foreground">Code</dt>
+                          <dd className="col-span-2 text-sm font-mono">{form.getValues().code}</dd>
+                        </div>
+                        {form.getValues().expiryDate && (
+                          <div className="py-2 grid grid-cols-3">
+                            <dt className="text-sm font-medium text-muted-foreground">Expires</dt>
+                            <dd className="col-span-2 text-sm">
+                              {new Date(form.getValues().expiryDate).toLocaleDateString()}
+                            </dd>
+                          </div>
+                        )}
+                        {form.getValues().message && (
+                          <div className="py-2 grid grid-cols-3">
+                            <dt className="text-sm font-medium text-muted-foreground">Message</dt>
+                            <dd className="col-span-2 text-sm italic">"{form.getValues().message}"</dd>
+                          </div>
+                        )}
+                      </dl>
+                    </div>
+                    
+                    <div className="flex flex-col space-y-3">
+                      <Button 
+                        type="submit" 
+                        className="w-full" 
+                        disabled={isCreating || !form.formState.isValid || !!profanityError || duplicateError}
+                      >
+                        {isCreating ? (
+                          <>
+                            <Loader className="mr-2 h-4 w-4 animate-spin" />
+                            Creating...
+                          </>
+                        ) : (
+                          <>
+                            <Share className="mr-2 h-4 w-4" />
+                            Create & Send Voucher
+                          </>
+                        )}
+                      </Button>
+                      
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        className="w-full" 
+                        onClick={onBackToDetails}
+                        disabled={isCreating}
+                      >
+                        Back to Details
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               )}
-            </Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+      
+      <RecentVouchers />
+    </>
   );
 }

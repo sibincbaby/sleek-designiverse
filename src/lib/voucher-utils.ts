@@ -12,37 +12,58 @@ export function generateUniqueId(): string {
  */
 export const VOUCHER_THEMES = [
   { 
+    id: "light", 
+    name: "Light", 
+    colors: "bg-gradient-to-r from-blue-50 via-white to-blue-50 text-blue-900", 
+    icon: "sun",
+    emoji: "☀️"
+  },
+  { 
+    id: "dark", 
+    name: "Dark", 
+    colors: "bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white", 
+    icon: "moon",
+    emoji: "🌙" 
+  },
+  { 
+    id: "elegant", 
+    name: "Elegant", 
+    colors: "bg-gradient-to-r from-purple-900 via-purple-800 to-indigo-800 text-white", 
+    icon: "sparkles",
+    emoji: "✨" 
+  },
+  { 
     id: "birthday", 
     name: "Birthday", 
-    colors: "bg-gradient-to-r from-pink-500 via-pink-400 to-purple-600", 
+    colors: "bg-gradient-to-r from-pink-500 via-pink-400 to-purple-600 text-white", 
     icon: "cake",
     emoji: "🎂"
   },
   { 
     id: "wedding", 
     name: "Wedding", 
-    colors: "bg-gradient-to-r from-blue-300 via-indigo-400 to-blue-500", 
+    colors: "bg-gradient-to-r from-blue-300 via-indigo-400 to-blue-500 text-white", 
     icon: "heart",
     emoji: "💍" 
   },
   { 
     id: "anniversary", 
     name: "Anniversary", 
-    colors: "bg-gradient-to-r from-amber-400 via-red-400 to-amber-500", 
+    colors: "bg-gradient-to-r from-amber-400 via-red-400 to-amber-500 text-white", 
     icon: "trophy",
     emoji: "🥂" 
   },
   { 
     id: "thank-you", 
     name: "Thank You", 
-    colors: "bg-gradient-to-r from-emerald-400 via-green-500 to-teal-500", 
+    colors: "bg-gradient-to-r from-emerald-400 via-green-500 to-teal-500 text-white", 
     icon: "smile",
     emoji: "🙏" 
   },
   { 
     id: "congratulations", 
     name: "Congratulations", 
-    colors: "bg-gradient-to-r from-yellow-300 via-yellow-400 to-orange-500", 
+    colors: "bg-gradient-to-r from-yellow-300 via-yellow-400 to-orange-500 text-white", 
     icon: "award",
     emoji: "🎉" 
   },
@@ -57,6 +78,7 @@ export interface VoucherData {
   theme: VoucherTheme;
   provider: string;
   message?: string;
+  expiryDate?: string;
   createdAt: number;
 }
 
@@ -66,6 +88,28 @@ const SUSPICIOUS_WORDS = [
   'exclusive', 'prize', 'gift', 'promotion', 'deal', 'bargain', 'sale',
   'cash', 'money', 'bonus', 'unlimited'
 ];
+
+// List of profanity/offensive words to block
+export const BLOCKED_WORDS = [
+  'fuck', 'shit', 'bitch', 'ass', 'asshole', 'cunt', 'dick', 'bastard',
+  'whore', 'slut', 'piss', 'damn', 'hell', 'nigger', 'nigga', 'fag',
+  'faggot', 'retard', 'moron', 'idiot', 'stupid', 'dumb', 'pussy', 'cock'
+];
+
+/**
+ * Checks text for profanity/offensive words
+ */
+export function containsProfanity(text: string): boolean {
+  if (!text) return false;
+  
+  const normalizedText = text.toLowerCase().trim();
+  
+  // Check for exact matches or partial matches with common variations
+  return BLOCKED_WORDS.some(word => {
+    const regex = new RegExp(`\\b${word}\\b|\\b${word}[*]+\\b|\\b${word[0]}[*]+${word.slice(-1)}\\b`, 'i');
+    return regex.test(normalizedText);
+  });
+}
 
 /**
  * Sanitizes text to avoid spam detection
@@ -107,6 +151,47 @@ export function sanitizeText(text: string): string {
 }
 
 /**
+ * Checks if a voucher has expired
+ */
+export function isVoucherExpired(expiryDate?: string): boolean {
+  if (!expiryDate) return false;
+  
+  const expiry = new Date(expiryDate);
+  const now = new Date();
+  
+  return now > expiry;
+}
+
+/**
+ * Returns the remaining time until expiry in a formatted string
+ */
+export function getExpiryTimeRemaining(expiryDate?: string): string {
+  if (!expiryDate) return '';
+  
+  const expiry = new Date(expiryDate);
+  const now = new Date();
+  
+  if (now > expiry) return 'Expired';
+  
+  const diffMs = expiry.getTime() - now.getTime();
+  
+  // Calculate days, hours, minutes
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  
+  if (days > 0) {
+    return `${days}d ${hours}h remaining`;
+  }
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m remaining`;
+  }
+  
+  return `${minutes}m remaining`;
+}
+
+/**
  * Creates a shareable URL that includes voucher data
  */
 export function createShareableVoucherUrl(voucher: VoucherData): string {
@@ -118,6 +203,7 @@ export function createShareableVoucherUrl(voucher: VoucherData): string {
     theme: voucher.theme,
     provider: voucher.provider,
     message: voucher.message,
+    expiryDate: voucher.expiryDate,
     createdAt: voucher.createdAt
   };
   

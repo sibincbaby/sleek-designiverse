@@ -5,7 +5,7 @@ import { useVoucher } from "@/contexts/VoucherContext";
 import { VoucherDisplay } from "@/components/voucher/VoucherDisplay";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, PlusCircle } from "lucide-react";
-import { VoucherData, VoucherTheme, updateMetaTags } from "@/lib/voucher-utils";
+import { VoucherData, VoucherTheme, updateMetaTags, isVoucherExpired } from "@/lib/voucher-utils";
 
 export default function VoucherView() {
   const { id } = useParams<{ id: string }>();
@@ -31,13 +31,15 @@ export default function VoucherView() {
             code: decodedData.code,
             theme: decodedData.theme,
             provider: decodedData.provider || "",
+            message: decodedData.message,
+            expiryDate: decodedData.expiryDate,
             createdAt: decodedData.createdAt
           };
           
           setVoucherData(voucher);
           
           // Update meta tags with voucher information
-          updateMetaTags(voucher.title, voucher.provider, voucher.theme);
+          updateMetaTags(voucher.title, voucher.provider, voucher.theme, voucher.message);
           
           setLoading(false);
           return;
@@ -58,7 +60,7 @@ export default function VoucherView() {
         setVoucherData(storedVoucher);
         
         // Update meta tags with voucher information
-        updateMetaTags(storedVoucher.title, storedVoucher.provider, storedVoucher.theme);
+        updateMetaTags(storedVoucher.title, storedVoucher.provider, storedVoucher.theme, storedVoucher.message);
       } else {
         setNotFound(!encodedData); // Only set not found if we also didn't have URL data
       }
@@ -92,6 +94,9 @@ export default function VoucherView() {
       </div>
     );
   }
+  
+  // Check if voucher is expired (for UI messaging)
+  const isExpired = voucherData?.expiryDate ? isVoucherExpired(voucherData.expiryDate) : false;
   
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4">

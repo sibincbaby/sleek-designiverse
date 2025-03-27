@@ -1,10 +1,10 @@
 
-import React, { useState } from "react";
-import { Calendar, Copy, Share, Gift, Tag, MessageSquare } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Calendar, Copy, Share, Tag, MessageSquare, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { VOUCHER_THEMES, VoucherData, shortenUrl } from "@/lib/voucher-utils";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { VOUCHER_THEMES, VoucherData, shortenUrl, isVoucherExpired, getExpiryTimeRemaining } from "@/lib/voucher-utils";
 
 interface VoucherDisplayProps {
   voucher: VoucherData;
@@ -14,10 +14,31 @@ export function VoucherDisplay({ voucher }: VoucherDisplayProps) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState('');
+  const [expired, setExpired] = useState(false);
   
   const theme = VOUCHER_THEMES.find(t => t.id === voucher.theme) || VOUCHER_THEMES[0];
   
+  useEffect(() => {
+    // Check if voucher has expired
+    if (voucher.expiryDate) {
+      const checkExpiry = () => {
+        const isExpired = isVoucherExpired(voucher.expiryDate);
+        setExpired(isExpired);
+        setTimeRemaining(getExpiryTimeRemaining(voucher.expiryDate));
+      };
+      
+      checkExpiry();
+      
+      // Update countdown every minute
+      const interval = setInterval(checkExpiry, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [voucher.expiryDate]);
+  
   const copyCode = () => {
+    if (expired) return;
+    
     navigator.clipboard.writeText(voucher.code);
     setCopied(true);
     toast({
@@ -53,7 +74,7 @@ export function VoucherDisplay({ voucher }: VoucherDisplayProps) {
         // If Web Share API is not available, copy the shortened link
         await navigator.clipboard.writeText(shortenedUrl);
         toast({
-          title: "Ready to share!",
+          title: "Link copied!",
           description: "The voucher link is now on your clipboard, ready to send.",
         });
       }
@@ -70,7 +91,7 @@ export function VoucherDisplay({ voucher }: VoucherDisplayProps) {
   };
   
   return (
-    <Card className={`w-full max-w-md mx-auto overflow-hidden shadow-lg ${theme.colors} text-white`}>
+    <Card className={`w-full max-w-md mx-auto overflow-hidden shadow-lg ${theme.colors}`}>
       <CardHeader className="pb-2">
         <div className="flex justify-between items-center">
           <Calendar className="h-6 w-6" />
@@ -88,12 +109,23 @@ export function VoucherDisplay({ voucher }: VoucherDisplayProps) {
             <span>{voucher.provider}</span>
           </div>
         )}
+        
+        {voucher.expiryDate && (
+          <div className={`mt-2 text-sm ${expired ? 'bg-red-500/20' : 'bg-white/10'} px-2 py-1 rounded-md flex items-center w-fit`}>
+            <Clock className="h-4 w-4 mr-1" />
+            <span>{timeRemaining}</span>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="pb-2">
         <div className="bg-white/20 backdrop-blur-sm rounded-lg p-6 text-center">
           <p className="text-sm mb-2 opacity-80">Your voucher code:</p>
           <div className="text-3xl font-mono font-bold tracking-wider break-all">
-            {voucher.code}
+            {expired ? (
+              <span className="text-red-200">This voucher has expired</span>
+            ) : (
+              voucher.code
+            )}
           </div>
         </div>
         
@@ -111,7 +143,8 @@ export function VoucherDisplay({ voucher }: VoucherDisplayProps) {
         <Button 
           onClick={copyCode} 
           variant="secondary" 
-          className="text-black bg-white hover:bg-white/90"
+          className="text-black bg-white hover:bg-white/90 disabled:opacity-50"
+          disabled={expired}
         >
           <Copy className="mr-2 h-4 w-4" />
           {copied ? "Copied!" : "Copy Code"}
