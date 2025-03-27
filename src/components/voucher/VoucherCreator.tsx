@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -5,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { useVoucher } from "@/contexts/VoucherContext";
 import { VOUCHER_THEMES, VoucherTheme, shortenUrl, sanitizeText, containsProfanity } from "@/lib/voucher-utils";
-import { Gift, Share, Loader, AlertCircle, Calendar, Copy, Link2, Check } from "lucide-react";
+import { Gift, Share, Loader, AlertCircle, Calendar, Copy, Link2, Check, Info } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { VoucherPreview } from "./VoucherPreview";
 import { RecentVouchers } from "./RecentVouchers";
 
@@ -55,6 +57,8 @@ export function VoucherCreator() {
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [shortUrl, setShortUrl] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [dailyVoucherCount, setDailyVoucherCount] = useState(0);
+  const [limitReached, setLimitReached] = useState(false);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -71,14 +75,17 @@ export function VoucherCreator() {
   // Check for daily limit on initial load
   useEffect(() => {
     const dailyCount = getDailyVoucherCount();
+    setDailyVoucherCount(dailyCount);
+    
     if (dailyCount >= MAX_DAILY_VOUCHERS) {
+      setLimitReached(true);
       setRateLimitError(`You have reached the daily limit of ${MAX_DAILY_VOUCHERS} vouchers. Please try again tomorrow.`);
     }
   }, [getDailyVoucherCount]);
 
   // Reset errors when form values change and check for profanity/duplicates
   useEffect(() => {
-    if (rateLimitError) setRateLimitError("");
+    if (rateLimitError && !limitReached) setRateLimitError("");
     if (profanityError) setProfanityError("");
     
     // Check for profanity in real-time
@@ -100,7 +107,7 @@ export function VoucherCreator() {
     } else {
       setDuplicateError(false);
     }
-  }, [form.watch(), rateLimitError, profanityError, isDuplicateCode]);
+  }, [form.watch(), rateLimitError, profanityError, isDuplicateCode, limitReached]);
 
   // Function to check if we can generate a new voucher
   const canGenerateVoucher = (): boolean => {
@@ -140,21 +147,25 @@ export function VoucherCreator() {
       // If it's a new day, reset the counter
       if (date !== today) {
         localStorage.setItem('dailyVoucherCount', JSON.stringify({ count: 1, date: today }));
+        setDailyVoucherCount(1);
         return true;
       }
       
       // Check if we've hit the limit
       if (count >= MAX_DAILY_VOUCHERS) {
         setRateLimitError(`You have reached the daily limit of ${MAX_DAILY_VOUCHERS} vouchers. Please try again tomorrow.`);
+        setLimitReached(true);
         return false;
       }
       
       // Update the counter for today
       localStorage.setItem('dailyVoucherCount', JSON.stringify({ count: count + 1, date: today }));
+      setDailyVoucherCount(count + 1);
     } else {
       // First voucher of the day
       const today = new Date().toDateString();
       localStorage.setItem('dailyVoucherCount', JSON.stringify({ count: 1, date: today }));
+      setDailyVoucherCount(1);
     }
     
     return true;
@@ -271,10 +282,54 @@ export function VoucherCreator() {
     }
   };
 
+  if (limitReached && !isPreviewMode && !shortUrl) {
+    return (
+      <Card className="w-full max-w-4xl mx-auto">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-center">
+            Daily Limit Reached
+          </CardTitle>
+          <CardDescription className="text-center">
+            You have created the maximum number of vouchers for today
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Daily Limit Reached</AlertTitle>
+            <AlertDescription>
+              You have reached the daily limit of {MAX_DAILY_VOUCHERS} vouchers. Please try again tomorrow.
+            </AlertDescription>
+          </Alert>
+          
+          <RecentVouchers />
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <>
       <Card className="w-full max-w-4xl mx-auto">
-        <CardHeader>
+        <CardHeader className="relative">
+          <div className="absolute right-6 top-6">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center">
+                  <div className={`p-1.5 rounded-full flex items-center justify-center ${dailyVoucherCount >= MAX_DAILY_VOUCHERS ? 'bg-red-100 text-red-600' : dailyVoucherCount > MAX_DAILY_VOUCHERS * 0.7 ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+                    <Info className="h-4 w-4" />
+                  </div>
+                  <span className="ml-1.5 text-xs font-medium">
+                    {dailyVoucherCount}/{MAX_DAILY_VOUCHERS}
+                  </span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                <p>You can create up to {MAX_DAILY_VOUCHERS} vouchers per day.</p>
+                <p className="text-xs text-muted-foreground">You have created {dailyVoucherCount} today.</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
           <CardTitle className="text-2xl font-bold text-center">
             {isPreviewMode ? "Preview & Create Your Voucher" : "Create a Voucher"}
           </CardTitle>
