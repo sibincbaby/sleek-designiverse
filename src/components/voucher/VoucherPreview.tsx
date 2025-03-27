@@ -14,6 +14,14 @@ export function VoucherPreview({ voucher, onThemeChange }: VoucherPreviewProps) 
   const isExpired = voucher.expiryDate ? isVoucherExpired(voucher.expiryDate) : false;
   const expiryTimeRemaining = voucher.expiryDate ? getExpiryTimeRemaining(voucher.expiryDate) : '';
   
+  // Handler to prevent the default form submission when clicking theme buttons
+  const handleThemeClick = (e: React.MouseEvent<HTMLButtonElement>, themeId: VoucherTheme) => {
+    e.preventDefault(); // Prevent form submission
+    if (onThemeChange) {
+      onThemeChange(themeId);
+    }
+  };
+  
   return (
     <div className="w-full">
       <h3 className="text-lg font-medium mb-3">Preview</h3>
@@ -25,7 +33,8 @@ export function VoucherPreview({ voucher, onThemeChange }: VoucherPreviewProps) 
             {VOUCHER_THEMES.map((t) => (
               <button
                 key={t.id}
-                onClick={() => onThemeChange(t.id)}
+                onClick={(e) => handleThemeClick(e, t.id)}
+                type="button" // Explicitly set to button type to prevent form submission
                 className={`${
                   voucher.theme === t.id
                     ? 'ring-2 ring-primary'

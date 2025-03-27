@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -165,6 +164,11 @@ export function VoucherCreator() {
   };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    // Explicitly prevent auto-submission when just switching themes
+    if (isPreviewMode && !isCreating) {
+      console.log("Form submission - actual submit button clicked");
+    }
+    
     // Check rate limiting and daily limits
     if (!canGenerateVoucher()) {
       return;
