@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { Calendar, Copy, Share, Gift, Tag } from "lucide-react";
+import { Calendar, Copy, Share, Gift, Tag, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,14 +31,22 @@ export function VoucherDisplay({ voucher }: VoucherDisplayProps) {
   const shareVoucher = async () => {
     setSharing(true);
     try {
-      // Get the current URL and shorten it
-      const currentUrl = window.location.href;
+      // Get the current URL and add a timestamp to prevent duplicate URLs
+      const timestamp = Date.now();
+      let currentUrl = window.location.href;
+      
+      // Add timestamp if not already there
+      if (!currentUrl.includes('t=')) {
+        currentUrl += (currentUrl.includes('?') ? '&' : '?') + `t=${timestamp}`;
+      }
+      
+      // Shorten the URL with the timestamp
       const shortenedUrl = await shortenUrl(currentUrl);
       
       if (navigator.share) {
         await navigator.share({
           title: voucher.title,
-          text: `Check out my ${voucher.provider ? voucher.provider + ' ' : ''}voucher: ${voucher.title}`,
+          text: `Check out my ${voucher.provider ? voucher.provider + ' ' : ''}voucher: ${voucher.title}${voucher.message ? ' - ' + voucher.message : ''}`,
           url: shortenedUrl,
         });
       } else {
@@ -88,6 +96,16 @@ export function VoucherDisplay({ voucher }: VoucherDisplayProps) {
             {voucher.code}
           </div>
         </div>
+        
+        {voucher.message && (
+          <div className="mt-4 bg-white/10 p-3 rounded-lg">
+            <div className="flex items-center text-sm mb-1">
+              <MessageSquare className="h-4 w-4 mr-1" />
+              <span className="opacity-80">Personal Message:</span>
+            </div>
+            <p className="text-sm italic">"{voucher.message}"</p>
+          </div>
+        )}
       </CardContent>
       <CardFooter className="flex gap-2 justify-center pt-0">
         <Button 

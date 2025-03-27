@@ -1,5 +1,4 @@
 
-
 /**
  * Generates a unique ID for voucher links
  */
@@ -57,37 +56,96 @@ export interface VoucherData {
   code: string;
   theme: VoucherTheme;
   provider: string;
+  message?: string;
   createdAt: number;
+}
+
+// List of words that might trigger spam filters
+const SUSPICIOUS_WORDS = [
+  'free', 'win', 'winner', 'offer', 'discount', 'limited', 'special', 
+  'exclusive', 'prize', 'gift', 'promotion', 'deal', 'bargain', 'sale',
+  'cash', 'money', 'bonus', 'unlimited'
+];
+
+/**
+ * Sanitizes text to avoid spam detection
+ */
+export function sanitizeText(text: string): string {
+  if (!text) return '';
+  
+  // Normalize the text (trim and remove extra spaces)
+  let sanitized = text.trim().replace(/\s+/g, ' ');
+  
+  // Convert to lowercase for comparison
+  const lowerText = sanitized.toLowerCase();
+  
+  // Check for suspicious words and replace them with safer alternatives
+  SUSPICIOUS_WORDS.forEach(word => {
+    // Only replace whole words, not parts of words
+    const regex = new RegExp(`\\b${word}\\b`, 'gi');
+    
+    // Build a replacement based on the word
+    let replacement;
+    switch (word) {
+      case 'free': replacement = 'no-cost'; break;
+      case 'discount': replacement = 'savings'; break;
+      case 'offer': replacement = 'option'; break;
+      case 'win': case 'winner': replacement = 'receive'; break;
+      case 'prize': case 'gift': replacement = 'present'; break;
+      case 'unlimited': replacement = 'full'; break;
+      case 'promotion': case 'deal': replacement = 'opportunity'; break;
+      default: replacement = ''; // Remove the word if no replacement
+    }
+    
+    sanitized = sanitized.replace(regex, replacement);
+  });
+  
+  // Remove any special characters that aren't needed
+  sanitized = sanitized.replace(/[^\w\s.,!?-]/g, '');
+  
+  return sanitized;
 }
 
 /**
  * Creates a shareable URL that includes voucher data
  */
 export function createShareableVoucherUrl(voucher: VoucherData): string {
+  const timestamp = Date.now(); // Add timestamp to make URL unique
   const baseUrl = `${window.location.origin}/voucher/${voucher.id}`;
   const dataToEncode = {
     title: voucher.title,
     code: voucher.code,
     theme: voucher.theme,
     provider: voucher.provider,
+    message: voucher.message,
     createdAt: voucher.createdAt
   };
   
   const encodedData = encodeURIComponent(btoa(JSON.stringify(dataToEncode)));
-  return `${baseUrl}?data=${encodedData}`;
+  return `${baseUrl}?data=${encodedData}&t=${timestamp}`;
 }
 
 /**
- * Shortens a URL using is.gd service
+ * Shortens a URL using is.gd service with safeguards against rate limiting
  */
 export async function shortenUrl(longUrl: string): Promise<string> {
   try {
-    const response = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(longUrl)}`);
-    if (!response.ok) {
-      throw new Error('URL shortening service failed');
+    // Add a small random variation to prevent duplicate URLs if not already present
+    if (!longUrl.includes('t=')) {
+      const separator = longUrl.includes('?') ? '&' : '?';
+      longUrl += `${separator}t=${Date.now()}`;
     }
+    
+    // First try with is.gd
+    const response = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(longUrl)}`);
+    
+    if (!response.ok) {
+      console.warn('URL shortening service returned an error, using original URL');
+      return longUrl;
+    }
+    
     const data = await response.json();
-    return data.shorturl;
+    return data.shorturl || longUrl;
   } catch (error) {
     console.error('Error shortening URL:', error);
     return longUrl; // Return original URL if shortening fails
@@ -97,7 +155,7 @@ export async function shortenUrl(longUrl: string): Promise<string> {
 /**
  * Updates the document's meta tags for better link sharing
  */
-export function updateMetaTags(title: string, provider: string, theme: VoucherTheme): void {
+export function updateMetaTags(title: string, provider: string, theme: VoucherTheme, message?: string): void {
   // Update title
   document.title = title || 'Voucher';
   
@@ -108,9 +166,17 @@ export function updateMetaTags(title: string, provider: string, theme: VoucherTh
     metaDescription.setAttribute('name', 'description');
     document.head.appendChild(metaDescription);
   }
+  
   const themeInfo = VOUCHER_THEMES.find(t => t.id === theme) || VOUCHER_THEMES[0];
-  metaDescription.setAttribute('content', 
-    `${title} - ${provider ? `${provider} voucher` : 'Gift voucher'} ${themeInfo.emoji}`);
+  let descriptionText = `${title} - ${provider ? `${provider} voucher` : 'Gift voucher'} ${themeInfo.emoji}`;
+  
+  // Add a snippet of the message if available
+  if (message) {
+    const messageSnippet = message.length > 50 ? message.substring(0, 47) + '...' : message;
+    descriptionText += ` "${messageSnippet}"`;
+  }
+  
+  metaDescription.setAttribute('content', descriptionText);
   
   // Update OG tags
   let ogTitle = document.querySelector('meta[property="og:title"]');
@@ -127,7 +193,12 @@ export function updateMetaTags(title: string, provider: string, theme: VoucherTh
     ogDescription.setAttribute('property', 'og:description');
     document.head.appendChild(ogDescription);
   }
-  ogDescription.setAttribute('content', 
-    `${provider ? `${provider} voucher` : 'Gift voucher'} - Click to view and use the code! ${themeInfo.emoji}`);
+  
+  let ogDescText = `${provider ? `${provider} voucher` : 'Gift voucher'} - Click to view and use the code! ${themeInfo.emoji}`;
+  if (message) {
+    const messageSnippet = message.length > 30 ? message.substring(0, 27) + '...' : message;
+    ogDescText += ` "${messageSnippet}"`;
+  }
+  
+  ogDescription.setAttribute('content', ogDescText);
 }
-
