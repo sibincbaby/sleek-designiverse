@@ -5,7 +5,7 @@ import { VoucherData, VoucherTheme, generateUniqueId } from "@/lib/voucher-utils
 interface VoucherContextProps {
   vouchers: VoucherData[];
   currentVoucher: VoucherData | null;
-  createVoucher: (title: string, code: string, theme: VoucherTheme, provider: string) => string;
+  createVoucher: (title: string, code: string, theme: VoucherTheme, provider: string, message?: string) => string;
   getVoucherById: (id: string) => VoucherData | undefined;
 }
 
@@ -30,7 +30,7 @@ export function VoucherProvider({ children }: { children: React.ReactNode }) {
     }
   }, [vouchers]);
 
-  const createVoucher = (title: string, code: string, theme: VoucherTheme, provider: string) => {
+  const createVoucher = (title: string, code: string, theme: VoucherTheme, provider: string, message?: string) => {
     const id = generateUniqueId();
     const newVoucher: VoucherData = {
       id,
@@ -38,6 +38,7 @@ export function VoucherProvider({ children }: { children: React.ReactNode }) {
       code,
       theme,
       provider,
+      message,
       createdAt: Date.now()
     };
     
