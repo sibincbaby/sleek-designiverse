@@ -6,14 +6,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { useVoucher } from "@/contexts/VoucherContext";
 import { VOUCHER_THEMES, VoucherTheme, shortenUrl, sanitizeText, containsProfanity } from "@/lib/voucher-utils";
-import { Gift, Share, Loader, AlertCircle, Calendar, Copy, Link2, Check, Info } from "lucide-react";
+import { Gift, Share, Loader, AlertCircle, Calendar, Copy, Check, Info } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { VoucherPreview } from "./VoucherPreview";
 import { RecentVouchers } from "./RecentVouchers";
@@ -202,6 +201,32 @@ export function VoucherCreator() {
         title: "Link copied!",
         description: "The voucher link has been copied to your clipboard.",
       });
+    }
+  };
+  
+  const handleShareVoucher = async () => {
+    if (shortUrl) {
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: `Voucher: ${form.getValues().title}`,
+            text: `Check out this voucher: ${form.getValues().code}`,
+            url: shortUrl
+          });
+          
+          toast({
+            title: "Shared successfully!",
+            description: "Your voucher has been shared.",
+          });
+        } catch (error) {
+          console.error("Error sharing:", error);
+          // Fallback to copy if sharing fails
+          handleCopyLink();
+        }
+      } else {
+        // Fallback for browsers that don't support share API
+        handleCopyLink();
+      }
     }
   };
 
@@ -483,17 +508,6 @@ export function VoucherCreator() {
                     )}
                   />
                   
-                  <div className="mt-4">
-                    <Alert variant="default" className="bg-slate-100">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertTitle>Daily Limit Information</AlertTitle>
-                      <AlertDescription className="text-sm">
-                        You can create up to {MAX_DAILY_VOUCHERS} vouchers per day. 
-                        You have created {getDailyVoucherCount()} today.
-                      </AlertDescription>
-                    </Alert>
-                  </div>
-                  
                   <Button 
                     type="button" 
                     className="w-full" 
@@ -555,54 +569,16 @@ export function VoucherCreator() {
                           <div className="truncate mr-2 flex-grow text-sm">
                             {shortUrl}
                           </div>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="outline" size="sm" type="button" onClick={handleCopyLink}>
-                                {copySuccess ? (
-                                  <Check className="h-4 w-4 text-green-500" />
-                                ) : (
-                                  <Copy className="h-4 w-4" />
-                                )}
-                                <span className="sr-only">Copy</span>
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-3" side="top">
-                              <div className="flex flex-col space-y-2">
-                                <Button 
-                                  type="button" 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="whitespace-nowrap flex items-center"
-                                  onClick={handleCopyLink}
-                                >
-                                  <Copy className="mr-1 h-3 w-3" />
-                                  Copy link
-                                </Button>
-                                
-                                <Button 
-                                  type="button" 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="whitespace-nowrap flex items-center"
-                                  onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`Check out this voucher: ${shortUrl}`)}`, '_blank')}
-                                >
-                                  <Share className="mr-1 h-3 w-3" />
-                                  Share via WhatsApp
-                                </Button>
-                                
-                                <Button 
-                                  type="button" 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="whitespace-nowrap flex items-center"
-                                  onClick={() => window.open(`mailto:?subject=${encodeURIComponent(`Voucher: ${form.getValues().title}`)}&body=${encodeURIComponent(`I've created a voucher for you: ${shortUrl}`)}`, '_blank')}
-                                >
-                                  <Link2 className="mr-1 h-3 w-3" />
-                                  Share via Email
-                                </Button>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            type="button" 
+                            className="flex items-center"
+                            onClick={handleShareVoucher}
+                          >
+                            <Share className="mr-1 h-4 w-4" />
+                            Share
+                          </Button>
                         </div>
                         
                         <Button 
@@ -613,6 +589,7 @@ export function VoucherCreator() {
                             form.reset();
                             setShortUrl(null);
                             setIsPreviewMode(false);
+                            setDuplicateError(false); // Reset duplicate error when creating a new voucher
                           }}
                         >
                           Create Another Voucher
@@ -628,7 +605,7 @@ export function VoucherCreator() {
                           {isCreating ? (
                             <>
                               <Loader className="mr-2 h-4 w-4 animate-spin" />
-                              Creating...\n
+                              Creating...
                             </>
                           ) : (
                             <>

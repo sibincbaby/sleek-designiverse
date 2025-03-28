@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { VoucherData, VoucherTheme, generateUniqueId } from "@/lib/voucher-utils";
 
@@ -75,7 +76,7 @@ export function VoucherProvider({ children }: { children: React.ReactNode }) {
     return vouchers.find(v => v.id === id);
   };
 
-  // Modified duplicate code checker to be more strict
+  // Modified duplicate code checker to be more strict and exact
   const isDuplicateCode = (code: string): boolean => {
     if (!code) return false;
     
@@ -83,11 +84,15 @@ export function VoucherProvider({ children }: { children: React.ReactNode }) {
     const today = new Date().toDateString();
     const normalizedCode = code.trim().toLowerCase();
     
-    return vouchers.some(v => {
-      const voucherDate = new Date(v.createdAt).toDateString();
-      const voucherCode = v.code.trim().toLowerCase();
-      return voucherCode === normalizedCode && voucherDate === today;
-    });
+    // Get vouchers created today only
+    const todayVouchers = vouchers.filter(v => 
+      new Date(v.createdAt).toDateString() === today
+    );
+    
+    // Check for exact match only (not partial matches)
+    return todayVouchers.some(v => 
+      v.code.trim().toLowerCase() === normalizedCode
+    );
   };
 
   // Add a method to get the current daily voucher count
