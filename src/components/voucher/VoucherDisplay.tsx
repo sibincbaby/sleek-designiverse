@@ -4,7 +4,7 @@ import { Calendar, Copy, Share, Tag, MessageSquare, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { VOUCHER_THEMES, VoucherData, shortenUrl, isVoucherExpired, getExpiryTimeRemaining } from "@/lib/voucher-utils";
+import { VOUCHER_THEMES, VoucherData, shortenUrl, isVoucherExpired, getExpiryTimeRemaining, updateMetaTags } from "@/lib/voucher-utils";
 
 interface VoucherDisplayProps {
   voucher: VoucherData;
@@ -20,6 +20,9 @@ export function VoucherDisplay({ voucher }: VoucherDisplayProps) {
   const theme = VOUCHER_THEMES.find(t => t.id === voucher.theme) || VOUCHER_THEMES[0];
   
   useEffect(() => {
+    // Update meta tags for better link sharing
+    updateMetaTags(voucher.title, voucher.provider, voucher.theme, voucher.message);
+    
     // Check if voucher has expired
     if (voucher.expiryDate) {
       const checkExpiry = () => {
@@ -34,7 +37,7 @@ export function VoucherDisplay({ voucher }: VoucherDisplayProps) {
       const interval = setInterval(checkExpiry, 60000);
       return () => clearInterval(interval);
     }
-  }, [voucher.expiryDate]);
+  }, [voucher.expiryDate, voucher.title, voucher.provider, voucher.theme, voucher.message]);
   
   const copyCode = () => {
     if (expired) return;

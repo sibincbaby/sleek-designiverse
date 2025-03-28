@@ -1,4 +1,3 @@
-
 /**
  * Generates a unique ID for voucher links
  */
@@ -156,7 +155,10 @@ export function sanitizeText(text: string): string {
 export function isVoucherExpired(expiryDate?: string): boolean {
   if (!expiryDate) return false;
   
+  // Set expiry to the end of the chosen day (23:59:59.999)
   const expiry = new Date(expiryDate);
+  expiry.setHours(23, 59, 59, 999);
+  
   const now = new Date();
   
   return now > expiry;
@@ -168,7 +170,10 @@ export function isVoucherExpired(expiryDate?: string): boolean {
 export function getExpiryTimeRemaining(expiryDate?: string): string {
   if (!expiryDate) return '';
   
+  // Set expiry to the end of the chosen day (23:59:59.999)
   const expiry = new Date(expiryDate);
+  expiry.setHours(23, 59, 59, 999);
+  
   const now = new Date();
   
   if (now > expiry) return 'Expired';
@@ -264,14 +269,14 @@ export function updateMetaTags(title: string, provider: string, theme: VoucherTh
   
   metaDescription.setAttribute('content', descriptionText);
   
-  // Update OG tags
+  // Update OG tags for link preview
   let ogTitle = document.querySelector('meta[property="og:title"]');
   if (!ogTitle) {
     ogTitle = document.createElement('meta');
     ogTitle.setAttribute('property', 'og:title');
     document.head.appendChild(ogTitle);
   }
-  ogTitle.setAttribute('content', title);
+  ogTitle.setAttribute('content', `${title} ${themeInfo.emoji}`);
   
   let ogDescription = document.querySelector('meta[property="og:description"]');
   if (!ogDescription) {
@@ -280,11 +285,19 @@ export function updateMetaTags(title: string, provider: string, theme: VoucherTh
     document.head.appendChild(ogDescription);
   }
   
-  let ogDescText = `${provider ? `${provider} voucher` : 'Gift voucher'} - Click to view and use the code! ${themeInfo.emoji}`;
-  if (message) {
-    const messageSnippet = message.length > 30 ? message.substring(0, 27) + '...' : message;
-    ogDescText += ` "${messageSnippet}"`;
-  }
+  let ogDescText = `${provider ? `${provider} voucher` : 'Gift voucher'} from ${title}. Click to view and use!`;
   
   ogDescription.setAttribute('content', ogDescText);
+  
+  // Create a dynamic OG image based on theme if possible
+  let ogImage = document.querySelector('meta[property="og:image"]');
+  if (!ogImage) {
+    ogImage = document.createElement('meta');
+    ogImage.setAttribute('property', 'og:image');
+    document.head.appendChild(ogImage);
+  }
+  
+  // Keep the default OG image for now - in a real implementation, you'd generate a dynamic image
+  // based on the voucher theme and title
+  ogImage.setAttribute('content', 'https://lovable.dev/opengraph-image-p98pqg.png');
 }
