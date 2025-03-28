@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -209,8 +208,8 @@ export function VoucherCreator() {
       if (navigator.share) {
         try {
           await navigator.share({
-            title: `Voucher: ${form.getValues().title}`,
-            text: `Check out this voucher: ${form.getValues().code}`,
+            title: `Check out my voucher`,
+            text: `Check out this voucher I created for you!`,
             url: shortUrl
           });
           
