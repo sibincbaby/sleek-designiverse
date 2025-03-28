@@ -4,7 +4,16 @@ import { Calendar, Copy, Share, Tag, MessageSquare, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { VOUCHER_THEMES, VoucherData, shortenUrl, isVoucherExpired, getExpiryTimeRemaining, updateMetaTags } from "@/lib/voucher-utils";
+import { 
+  VOUCHER_THEMES, 
+  VoucherData, 
+  shortenUrl, 
+  isVoucherExpired, 
+  isVoucherExpiredAsync, 
+  getExpiryTimeRemaining, 
+  getExpiryTimeRemainingAsync, 
+  updateMetaTags 
+} from "@/lib/voucher-utils";
 
 interface VoucherDisplayProps {
   voucher: VoucherData;
@@ -16,6 +25,7 @@ export function VoucherDisplay({ voucher }: VoucherDisplayProps) {
   const [sharing, setSharing] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState('');
   const [expired, setExpired] = useState(false);
+  const [isInitialChecking, setIsInitialChecking] = useState(true);
   
   const theme = VOUCHER_THEMES.find(t => t.id === voucher.theme) || VOUCHER_THEMES[0];
   
@@ -23,18 +33,32 @@ export function VoucherDisplay({ voucher }: VoucherDisplayProps) {
     // Update meta tags for better link sharing
     updateMetaTags(voucher.title, voucher.provider, voucher.theme, voucher.message);
     
-    // Check if voucher has expired
+    // Check if voucher has expired using server time
     if (voucher.expiryDate) {
-      const checkExpiry = () => {
-        const isExpired = isVoucherExpired(voucher.expiryDate);
-        setExpired(isExpired);
-        setTimeRemaining(getExpiryTimeRemaining(voucher.expiryDate));
+      const checkExpiry = async () => {
+        // Use both the async and sync methods
+        const [isExpiredAsync, timeRemainingAsync] = await Promise.all([
+          isVoucherExpiredAsync(voucher.expiryDate),
+          getExpiryTimeRemainingAsync(voucher.expiryDate)
+        ]);
+        
+        // Fall back to system time check if server check fails
+        const isExpiredSync = isVoucherExpired(voucher.expiryDate);
+        const timeRemainingSync = getExpiryTimeRemaining(voucher.expiryDate);
+        
+        // Use the server check if available, otherwise use the system time check
+        setExpired(isExpiredAsync);
+        setTimeRemaining(timeRemainingAsync);
+        setIsInitialChecking(false);
       };
       
       checkExpiry();
       
-      // Update countdown every minute
-      const interval = setInterval(checkExpiry, 60000);
+      // Update countdown every minute - using both async and sync methods
+      const interval = setInterval(() => {
+        checkExpiry();
+      }, 60000);
+      
       return () => clearInterval(interval);
     }
   }, [voucher.expiryDate, voucher.title, voucher.provider, voucher.theme, voucher.message]);
@@ -116,7 +140,11 @@ export function VoucherDisplay({ voucher }: VoucherDisplayProps) {
         {voucher.expiryDate && (
           <div className={`mt-2 text-sm ${expired ? 'bg-red-500/20' : 'bg-white/10'} px-2 py-1 rounded-md flex items-center w-fit`}>
             <Clock className="h-4 w-4 mr-1" />
-            <span>{timeRemaining}</span>
+            {isInitialChecking ? (
+              <span className="text-xs">Checking expiry...</span>
+            ) : (
+              <span>{timeRemaining}</span>
+            )}
           </div>
         )}
       </CardHeader>

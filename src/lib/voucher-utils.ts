@@ -81,6 +81,49 @@ export interface VoucherData {
   createdAt: number;
 }
 
+/**
+ * Fetches accurate UTC time from Cloudflare to prevent time manipulation
+ */
+export async function getServerTime(): Promise<Date> {
+  try {
+    const response = await fetch("https://www.cloudflare.com/cdn-cgi/trace");
+    const text = await response.text();
+    const match = text.match(/ts=(\d+)/);  // Extract timestamp (Unix time in seconds)
+    
+    if (match) {
+      return new Date(parseInt(match[1]) * 1000);  // Convert to JavaScript Date object
+    }
+  } catch (error) {
+    console.error("Failed to fetch server time:", error);
+  }
+  
+  return new Date(); // Fallback to system time if API fails
+}
+
+// Caching mechanism for server time to reduce API calls
+let cachedServerTime: Date | null = null;
+let lastFetchTime = 0;
+const CACHE_DURATION = 60000; // Cache for 1 minute
+
+/**
+ * Gets server time with caching
+ */
+export async function getAccurateTime(): Promise<Date> {
+  const now = Date.now();
+  
+  // Check if we need to refresh the cached time
+  if (!cachedServerTime || now - lastFetchTime > CACHE_DURATION) {
+    cachedServerTime = await getServerTime();
+    lastFetchTime = now;
+  }
+  
+  // Calculate the offset from when we fetched the time
+  const elapsedSinceCache = now - lastFetchTime;
+  const adjustedTime = new Date(cachedServerTime.getTime() + elapsedSinceCache);
+  
+  return adjustedTime;
+}
+
 // List of words that might trigger spam filters
 const SUSPICIOUS_WORDS = [
   'free', 'win', 'winner', 'offer', 'discount', 'limited', 'special', 
@@ -150,7 +193,22 @@ export function sanitizeText(text: string): string {
 }
 
 /**
- * Checks if a voucher has expired
+ * Checks if a voucher has expired using server time
+ */
+export async function isVoucherExpiredAsync(expiryDate?: string): Promise<boolean> {
+  if (!expiryDate) return false;
+  
+  // Set expiry to the end of the chosen day (23:59:59.999)
+  const expiry = new Date(expiryDate);
+  expiry.setHours(23, 59, 59, 999);
+  
+  const serverTime = await getAccurateTime();
+  
+  return serverTime > expiry;
+}
+
+/**
+ * Checks if a voucher has expired (synchronous version for backwards compatibility)
  */
 export function isVoucherExpired(expiryDate?: string): boolean {
   if (!expiryDate) return false;
@@ -179,6 +237,38 @@ export function getExpiryTimeRemaining(expiryDate?: string): string {
   if (now > expiry) return 'Expired';
   
   const diffMs = expiry.getTime() - now.getTime();
+  
+  // Calculate days, hours, minutes
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  
+  if (days > 0) {
+    return `${days}d ${hours}h remaining`;
+  }
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m remaining`;
+  }
+  
+  return `${minutes}m remaining`;
+}
+
+/**
+ * Returns the remaining time until expiry in a formatted string using server time
+ */
+export async function getExpiryTimeRemainingAsync(expiryDate?: string): Promise<string> {
+  if (!expiryDate) return '';
+  
+  // Set expiry to the end of the chosen day (23:59:59.999)
+  const expiry = new Date(expiryDate);
+  expiry.setHours(23, 59, 59, 999);
+  
+  const serverTime = await getAccurateTime();
+  
+  if (serverTime > expiry) return 'Expired';
+  
+  const diffMs = expiry.getTime() - serverTime.getTime();
   
   // Calculate days, hours, minutes
   const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
