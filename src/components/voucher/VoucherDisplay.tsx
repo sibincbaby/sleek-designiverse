@@ -66,8 +66,8 @@ export function VoucherDisplay({ voucher }: VoucherDisplayProps) {
       
       if (navigator.share) {
         await navigator.share({
-          title: voucher.title,
-          text: `Check out my ${voucher.provider ? voucher.provider + ' ' : ''}voucher: ${voucher.title}${voucher.message ? ' - ' + voucher.message : ''}`,
+          title: "Check out my voucher",
+          text: "Check out this voucher I created for you!",
           url: shortenedUrl,
         });
       } else {

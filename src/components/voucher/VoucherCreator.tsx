@@ -208,8 +208,8 @@ export function VoucherCreator() {
       if (navigator.share) {
         try {
           await navigator.share({
-            title: `Check out my voucher`,
-            text: `Check out this voucher I created for you!`,
+            title: "Check out my voucher",
+            text: "Check out this voucher I created for you!",
             url: shortUrl
           });
           

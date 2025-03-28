@@ -37,6 +37,7 @@ export function RecentVouchers() {
       if (navigator.share) {
         await navigator.share({
           title: "Check out my voucher",
+          text: "Check out this voucher I created for you!",
           url: shortenedUrl,
         });
       } else {
